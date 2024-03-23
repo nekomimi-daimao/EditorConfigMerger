@@ -50,10 +50,41 @@ export async function merge(
     const parsedConfigA = parse(a);
     const parsedConfigB = parse(b);
 
-    const compare = compareConfigArray(parsedConfigA, parsedConfigB);
-    console.log(compare);
+    const compareResults = compareConfigArray(parsedConfigA, parsedConfigB);
 
+    // always new
+    await Deno.writeTextFile(option.output, "", {create: true,})
 
+    for (const c of compareResults) {
+        await writeFileLine(option.output, "");
+        await writeFileLine(option.output, c.extension);
+        for (const d of c.same) {
+            await writeFileLine(option.output, `${d.key} = ${d.valueA}`);
+        }
+
+        // TODO c.diff
+
+        if (c.onlyA.length !== 0) {
+            await writeFileLine(option.output, "");
+            await writeFileLine(option.output, `# ${configA}`);
+        }
+        for (const d of c.onlyA) {
+            await writeFileLine(option.output, `${d.key} = ${d.valueA}`);
+        }
+
+        if (c.onlyB.length !== 0) {
+            await writeFileLine(option.output, "");
+            await writeFileLine(option.output, `# ${configB}`);
+        }
+        for (const d of c.onlyB) {
+            await writeFileLine(option.output, `${d.key} = ${d.valueB}`);
+        }
+    }
+}
+
+async function writeFileLine(path: string, data: string) {
+    const line = "\n";
+    await Deno.writeTextFile(path, `${data}${line}`, {append: true,});
 }
 
 export function compare() {
