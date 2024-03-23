@@ -1,7 +1,6 @@
 import {
     Command,
     HelpCommand,
-    ValidationError,
 } from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
 import {
     Confirm,
@@ -20,15 +19,7 @@ if (import.meta.main) {
         .command("merge", "merge .editorconfig")
         .arguments("<configA:string> <configB:string>")
         .option("-o, --output <output>", "output file path.", {required: true,})
-        .option("--superior <superior>", "superior.", {
-            action: (value) => {
-                if (!value.superior || ["a", "b"].includes(value.superior)) {
-                    throw new ValidationError(
-                        `a or b. "${value.superior}".`
-                    );
-                }
-            },
-        })
+        .option("--first2win", "in conflict, first wins.")
         .action(merge)
         // compare
         .command("compare", "compare .editorconfig")
@@ -43,7 +34,7 @@ if (import.meta.main) {
 export async function merge(
     option: {
         output: string;
-        superior?: string;
+        first2win?: boolean;
     },
     configA: string, configB: string) {
 
@@ -64,6 +55,9 @@ export async function merge(
 
     // always new
     await Deno.writeTextFile(option.output, "", {create: true,})
+    await writeFileLine(option.output, `# ${configA}`);
+    await writeFileLine(option.output, `# ${configB}`);
+    await writeFileLine(option.output, "");
 
     for (const c of compareResults) {
         await writeFileLine(option.output, "");
@@ -76,8 +70,9 @@ export async function merge(
         if (c.diff.length !== 0) {
             await writeFileLine(option.output, "");
             await writeFileLine(option.output, `# conflict`);
+            const first2win = option.first2win;
             for (const d of c.diff) {
-                const ab = await selectPrompt(d);
+                const ab = first2win || await selectPrompt(d);
                 await writeFileLine(option.output, `${d.key} = ${ab ? d.valueA : d.valueB}`);
             }
         }
@@ -124,7 +119,7 @@ function parse(config: string): ParsedEditorConfig[] {
 
     const result: ParsedEditorConfig[] = [];
     let current: ParsedEditorConfig = {extension: "", property: new Map<string, string>()};
-    for (let s of array) {
+    for (const s of array) {
         if (s.startsWith("#")) {
             continue;
         }
