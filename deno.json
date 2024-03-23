@@ -1,0 +1,8 @@
+{
+  "tasks": {
+    "merge": "deno run --allow-read --allow-write main.ts merge",
+    "compare": "deno run --allow-read main.ts compare",
+    "help": "deno run main.ts"
+  },
+  "lock": false
+}
