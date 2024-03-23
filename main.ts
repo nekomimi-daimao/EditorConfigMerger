@@ -1,4 +1,14 @@
-import {Command, HelpCommand, ValidationError,} from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
+import {
+    Command,
+    HelpCommand,
+    ValidationError,
+} from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
+import {
+    Confirm,
+    prompt,
+} from "https://deno.land/x/cliffy@v1.0.0-rc.3/prompt/mod.ts";
+
+const lineBreak = "\n";
 
 const version = "1.0.0";
 
@@ -58,33 +68,51 @@ export async function merge(
     for (const c of compareResults) {
         await writeFileLine(option.output, "");
         await writeFileLine(option.output, c.extension);
+
         for (const d of c.same) {
             await writeFileLine(option.output, `${d.key} = ${d.valueA}`);
         }
 
-        // TODO c.diff
+        if (c.diff.length !== 0) {
+            await writeFileLine(option.output, "");
+            await writeFileLine(option.output, `# conflict`);
+            for (const d of c.diff) {
+                const ab = await selectPrompt(d);
+                await writeFileLine(option.output, `${d.key} = ${ab ? d.valueA : d.valueB}`);
+            }
+        }
 
         if (c.onlyA.length !== 0) {
             await writeFileLine(option.output, "");
             await writeFileLine(option.output, `# ${configA}`);
-        }
-        for (const d of c.onlyA) {
-            await writeFileLine(option.output, `${d.key} = ${d.valueA}`);
+            for (const d of c.onlyA) {
+                await writeFileLine(option.output, `${d.key} = ${d.valueA}`);
+            }
         }
 
         if (c.onlyB.length !== 0) {
             await writeFileLine(option.output, "");
             await writeFileLine(option.output, `# ${configB}`);
+            for (const d of c.onlyB) {
+                await writeFileLine(option.output, `${d.key} = ${d.valueB}`);
+            }
         }
-        for (const d of c.onlyB) {
-            await writeFileLine(option.output, `${d.key} = ${d.valueB}`);
-        }
+
     }
 }
 
 async function writeFileLine(path: string, data: string) {
-    const line = "\n";
-    await Deno.writeTextFile(path, `${data}${line}`, {append: true,});
+    await Deno.writeTextFile(path, `${data}${lineBreak}`, {append: true,});
+}
+
+async function selectPrompt(diff: Diff): Promise<boolean> {
+    const result = await prompt([
+        {
+            name: "ab",
+            message: `${diff.key}${lineBreak}y : ${diff.valueA}${lineBreak}n : ${diff.valueB}`,
+            type: Confirm,
+        }]);
+    return result.ab ?? true;
 }
 
 export function compare() {
@@ -100,7 +128,7 @@ function parse(config: string): ParsedEditorConfig[] {
         if (s.startsWith("#")) {
             continue;
         }
-        const match = s.match(/\[.+\]/)?.input;
+        const match = s.match(/\[.+]/)?.input;
         if (match) {
             let parsedEditorConfig = result.find(c => c.extension === match);
             if (!parsedEditorConfig) {
