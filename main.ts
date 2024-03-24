@@ -1,11 +1,7 @@
-import {
-    Command,
-    HelpCommand,
-} from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
-import {
-    Confirm,
-    prompt,
-} from "https://deno.land/x/cliffy@v1.0.0-rc.3/prompt/mod.ts";
+import {Command, HelpCommand,} from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
+import {Confirm, prompt,} from "https://deno.land/x/cliffy@v1.0.0-rc.3/prompt/mod.ts";
+import {Table} from "https://deno.land/x/cliffy@v1.0.0-rc.3/table/mod.ts";
+import {colors} from "https://deno.land/x/cliffy@v1.0.0-rc.3/ansi/colors.ts";
 
 const lineBreak = "\n";
 
@@ -23,9 +19,9 @@ if (import.meta.main) {
         .action(merge)
         // compare
         .command("compare", "compare .editorconfig")
-        .action(compare)
         .arguments("<configA:string> <configB:string>")
         .option("-b, --beautify", "beautify output.")
+        .action(compare)
         // help
         .command("help", new HelpCommand().global())
         .parse(Deno.args);
@@ -110,8 +106,109 @@ async function selectPrompt(diff: Diff): Promise<boolean> {
     return result.ab ?? true;
 }
 
-export function compare() {
+export async function compare(
+    option: {
+        beautify?: boolean;
+    },
+    configA: string, configB: string) {
+    let a;
+    let b;
+    try {
+        a = await Deno.readTextFile(configA);
+        b = await Deno.readTextFile(configB);
+    } catch (e) {
+        console.log(e);
+        return;
+    }
 
+    const parsedConfigA = parse(a);
+    const parsedConfigB = parse(b);
+
+    const compareResults = compareConfigArray(parsedConfigA, parsedConfigB);
+    const beautify = option.beautify ?? false;
+
+    console.log(configA);
+    console.log(configB);
+
+    new Table()
+        .header(["same", "diff", "onlyA", "onlyB",])
+        .body([
+            [
+                compareResults.reduce(function (sum, element) {
+                    return sum + element.same.length;
+                }, 0),
+                compareResults.reduce(function (sum, element) {
+                    return sum + element.diff.length;
+                }, 0),
+                compareResults.reduce(function (sum, element) {
+                    return sum + element.onlyA.length;
+                }, 0),
+                compareResults.reduce(function (sum, element) {
+                    return sum + element.onlyB.length;
+                }, 0),
+            ]
+        ])
+        .border()
+        .render();
+
+    let body = [];
+
+    for (const compareResult of compareResults) {
+        console.log(compareResult.extension);
+
+        if (compareResult.same.length !== 0) {
+            console.log(colors.underline("same"));
+            body = [];
+            for (const d of compareResult.same) {
+                body.push([d.key]);
+                body.push([d.valueA]);
+            }
+            new Table()
+                .body(body)
+                .border()
+                .render();
+        }
+
+        if (compareResult.diff.length !== 0) {
+            console.log(colors.underline("diff"));
+            body = [];
+            for (const d of compareResult.diff) {
+                body.push([d.key]);
+                body.push([d.valueA, d.valueB]);
+            }
+            new Table()
+                .body(body)
+                .border()
+                .render();
+        }
+
+        if (compareResult.onlyA.length !== 0) {
+            console.log(colors.underline("onlyA"));
+            body = [];
+
+            for (const d of compareResult.onlyA) {
+                body.push([d.key]);
+                body.push([d.valueA]);
+            }
+            new Table()
+                .body(body)
+                .border()
+                .render();
+        }
+
+        if (compareResult.onlyB.length !== 0) {
+            console.log(colors.underline("onlyB"));
+            body = [];
+            for (const d of compareResult.onlyB) {
+                body.push([d.key]);
+                body.push([d.valueB]);
+            }
+            new Table()
+                .body(body)
+                .border()
+                .render();
+        }
+    }
 }
 
 function parse(config: string): ParsedEditorConfig[] {
