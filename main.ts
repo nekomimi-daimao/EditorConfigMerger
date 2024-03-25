@@ -20,7 +20,7 @@ if (import.meta.main) {
         // compare
         .command("compare", "compare .editorconfig")
         .arguments("<configA:string> <configB:string>")
-        .option("-b, --beautify", "beautify output.")
+        .option("-s, --status", "same/diff/onlyA/onlyB")
         .action(compare)
         // help
         .command("help", new HelpCommand().global())
@@ -108,7 +108,7 @@ async function selectPrompt(diff: Diff): Promise<boolean> {
 
 export async function compare(
     option: {
-        beautify?: boolean;
+        status?: boolean;
     },
     configA: string, configB: string) {
     let a;
@@ -125,7 +125,7 @@ export async function compare(
     const parsedConfigB = parse(b);
 
     const compareResults = compareConfigArray(parsedConfigA, parsedConfigB);
-    const beautify = option.beautify ?? false;
+    const status = option.status ?? false;
 
     console.log(configA);
     console.log(configB);
@@ -151,64 +151,79 @@ export async function compare(
         .border()
         .render();
 
+    let header = ["key", "status", "A", "B"];
+    if (!status) {
+        header = header.filter(item => item !== "status");
+    }
+
     let body = [];
 
     for (const compareResult of compareResults) {
+        body = [];
         console.log(compareResult.extension);
 
         if (compareResult.same.length !== 0) {
-            console.log(colors.underline("same"));
-            body = [];
             for (const d of compareResult.same) {
-                body.push([d.key]);
-                body.push([d.valueA]);
+                const v = [];
+                v.push(d.key);
+                if (status) {
+                    v.push("same");
+                }
+                v.push(d.valueA);
+                v.push(d.valueB);
+                body.push(v);
             }
-            new Table()
-                .body(body)
-                .border()
-                .render();
         }
-
         if (compareResult.diff.length !== 0) {
-            console.log(colors.underline("diff"));
-            body = [];
             for (const d of compareResult.diff) {
-                body.push([d.key]);
-                body.push([d.valueA, d.valueB]);
+                const v = [];
+                v.push(d.key);
+                if (status) {
+                    v.push("diff");
+                }
+                v.push(d.valueA);
+                v.push(d.valueB);
+                body.push(v);
             }
-            new Table()
-                .body(body)
-                .border()
-                .render();
         }
-
         if (compareResult.onlyA.length !== 0) {
-            console.log(colors.underline("onlyA"));
-            body = [];
-
             for (const d of compareResult.onlyA) {
-                body.push([d.key]);
-                body.push([d.valueA]);
+                const v = [];
+                v.push(d.key);
+                if (status) {
+                    v.push("onlyA");
+                }
+                v.push(d.valueA);
+                v.push(d.valueB);
+                body.push(v);
             }
-            new Table()
-                .body(body)
-                .border()
-                .render();
+        }
+        if (compareResult.onlyB.length !== 0) {
+            for (const d of compareResult.onlyB) {
+                const v = [];
+                v.push(d.key);
+                if (status) {
+                    v.push("onlyB");
+                }
+                v.push(d.valueA);
+                v.push(d.valueB);
+                body.push(v);
+            }
         }
 
-        if (compareResult.onlyB.length !== 0) {
-            console.log(colors.underline("onlyB"));
-            body = [];
-            for (const d of compareResult.onlyB) {
-                body.push([d.key]);
-                body.push([d.valueB]);
-            }
-            new Table()
-                .body(body)
-                .border()
-                .render();
+        header = ["key", "status", "A", "B"];
+        if (!status) {
+            header = header.filter(item => item !== "status");
         }
+
+        new Table()
+            .header(header)
+            .body(body)
+            // .border()
+            .render();
     }
+
+
 }
 
 function parse(config: string): ParsedEditorConfig[] {
