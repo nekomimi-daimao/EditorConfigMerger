@@ -1,7 +1,6 @@
 import {Command, HelpCommand,} from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
 import {Confirm, prompt,} from "https://deno.land/x/cliffy@v1.0.0-rc.3/prompt/mod.ts";
 import {Table} from "https://deno.land/x/cliffy@v1.0.0-rc.3/table/mod.ts";
-import {colors} from "https://deno.land/x/cliffy@v1.0.0-rc.3/ansi/colors.ts";
 
 const lineBreak = "\n";
 
@@ -21,6 +20,7 @@ if (import.meta.main) {
         .command("compare", "compare .editorconfig")
         .arguments("<configA:string> <configB:string>")
         .option("-s, --status", "same/diff/onlyA/onlyB")
+        .option("--limit <limit:number>", "table length limit")
         .action(compare)
         // help
         .command("help", new HelpCommand().global())
@@ -109,6 +109,7 @@ async function selectPrompt(diff: Diff): Promise<boolean> {
 export async function compare(
     option: {
         status?: boolean;
+        limit?: number;
     },
     configA: string, configB: string) {
     let a;
@@ -125,10 +126,12 @@ export async function compare(
     const parsedConfigB = parse(b);
 
     const compareResults = compareConfigArray(parsedConfigA, parsedConfigB);
-    const status = option.status ?? false;
 
-    console.log(configA);
-    console.log(configB);
+    console.log(`A:${configA}`);
+    console.log(`B:${configB}`);
+
+    const status = option.status ?? false;
+    const limit = option.limit ?? 40;
 
     new Table()
         .header(["same", "diff", "onlyA", "onlyB",])
@@ -165,48 +168,48 @@ export async function compare(
         if (compareResult.same.length !== 0) {
             for (const d of compareResult.same) {
                 const v = [];
-                v.push(d.key);
+                v.push(limitText(d.key, limit));
                 if (status) {
                     v.push("same");
                 }
-                v.push(d.valueA);
-                v.push(d.valueB);
+                v.push(limitText(d.valueA, limit));
+                v.push(limitText(d.valueB, limit));
                 body.push(v);
             }
         }
         if (compareResult.diff.length !== 0) {
             for (const d of compareResult.diff) {
                 const v = [];
-                v.push(d.key);
+                v.push(limitText(d.key, limit));
                 if (status) {
                     v.push("diff");
                 }
-                v.push(d.valueA);
-                v.push(d.valueB);
+                v.push(limitText(d.valueA, limit));
+                v.push(limitText(d.valueB, limit));
                 body.push(v);
             }
         }
         if (compareResult.onlyA.length !== 0) {
             for (const d of compareResult.onlyA) {
                 const v = [];
-                v.push(d.key);
+                v.push(limitText(d.key, limit));
                 if (status) {
                     v.push("onlyA");
                 }
-                v.push(d.valueA);
-                v.push(d.valueB);
+                v.push(limitText(d.valueA, limit));
+                v.push(limitText(d.valueB, limit));
                 body.push(v);
             }
         }
         if (compareResult.onlyB.length !== 0) {
             for (const d of compareResult.onlyB) {
                 const v = [];
-                v.push(d.key);
+                v.push(limitText(d.key, limit));
                 if (status) {
                     v.push("onlyB");
                 }
-                v.push(d.valueA);
-                v.push(d.valueB);
+                v.push(limitText(d.valueA, limit));
+                v.push(limitText(d.valueB, limit));
                 body.push(v);
             }
         }
@@ -219,8 +222,16 @@ export async function compare(
         new Table()
             .header(header)
             .body(body)
-            // .border()
+            .border()
             .render();
+    }
+
+    function limitText(text: string | undefined, limit: number) {
+        if (!text || text.length < limit) {
+            return text;
+        } else {
+            return text.substring(0, limit) + "…";
+        }
     }
 
 
