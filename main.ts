@@ -1,6 +1,7 @@
 import {Command, HelpCommand,} from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
 import {Confirm, prompt,} from "https://deno.land/x/cliffy@v1.0.0-rc.3/prompt/mod.ts";
 import {Table} from "https://deno.land/x/cliffy@v1.0.0-rc.3/table/mod.ts";
+import {colors} from "https://deno.land/x/cliffy@v1.0.0-rc.3/ansi/colors.ts";
 
 const lineBreak = "\n";
 
@@ -19,7 +20,6 @@ if (import.meta.main) {
         // compare
         .command("compare", "compare .editorconfig")
         .arguments("<configA:string> <configB:string>")
-        .option("-s, --status", "same/diff/onlyA/onlyB")
         .option("--limit <limit:number>", "table length limit")
         .action(compare)
         // help
@@ -108,7 +108,6 @@ async function selectPrompt(diff: Diff): Promise<boolean> {
 
 export async function compare(
     option: {
-        status?: boolean;
         limit?: number;
     },
     configA: string, configB: string) {
@@ -127,10 +126,9 @@ export async function compare(
 
     const compareResults = compareConfigArray(parsedConfigA, parsedConfigB);
 
-    console.log(`A:${configA}`);
-    console.log(`B:${configB}`);
+    console.log(colors.brightRed(`A:${configA}`));
+    console.log(colors.brightBlue(`B:${configB}`));
 
-    const status = option.status ?? false;
     const limit = option.limit ?? 40;
 
     new Table()
@@ -155,9 +153,6 @@ export async function compare(
         .render();
 
     let header = ["key", "status", "A", "B"];
-    if (!status) {
-        header = header.filter(item => item !== "status");
-    }
 
     let body = [];
 
@@ -169,9 +164,7 @@ export async function compare(
             for (const d of compareResult.same) {
                 const v = [];
                 v.push(limitText(d.key, limit));
-                if (status) {
-                    v.push("same");
-                }
+                v.push(colors.brightGreen("same"));
                 v.push(limitText(d.valueA, limit));
                 v.push(limitText(d.valueB, limit));
                 body.push(v);
@@ -181,9 +174,7 @@ export async function compare(
             for (const d of compareResult.diff) {
                 const v = [];
                 v.push(limitText(d.key, limit));
-                if (status) {
-                    v.push("diff");
-                }
+                v.push(colors.brightYellow("diff"));
                 v.push(limitText(d.valueA, limit));
                 v.push(limitText(d.valueB, limit));
                 body.push(v);
@@ -193,9 +184,7 @@ export async function compare(
             for (const d of compareResult.onlyA) {
                 const v = [];
                 v.push(limitText(d.key, limit));
-                if (status) {
-                    v.push("onlyA");
-                }
+                v.push(colors.brightRed("onlyA"));
                 v.push(limitText(d.valueA, limit));
                 v.push(limitText(d.valueB, limit));
                 body.push(v);
@@ -205,9 +194,7 @@ export async function compare(
             for (const d of compareResult.onlyB) {
                 const v = [];
                 v.push(limitText(d.key, limit));
-                if (status) {
-                    v.push("onlyB");
-                }
+                v.push(colors.brightBlue("onlyB"));
                 v.push(limitText(d.valueA, limit));
                 v.push(limitText(d.valueB, limit));
                 body.push(v);
@@ -215,9 +202,6 @@ export async function compare(
         }
 
         header = ["key", "status", "A", "B"];
-        if (!status) {
-            header = header.filter(item => item !== "status");
-        }
 
         new Table()
             .header(header)
